@@ -13,9 +13,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CheckCircle2, Github, Loader2 } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
+import { useUserStore } from '@/store/useUserStore'
 
 export default function SignupPage() {
   const router = useRouter()
+  const { setUser, setTokens } = useUserStore()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     username: "",
@@ -84,36 +86,29 @@ export default function SignupPage() {
         throw new Error(data.message || data.detail || 'Failed to create account')
       }
 
-      // Log the response data to debug
-      console.log('Signup response:', data)
+      // Extract tokens and user data
+      const accessToken = data.tokens?.access || data.access
+      const refreshToken = data.tokens?.refresh || data.refresh
+      const userData = data.user
 
-      // Store tokens and user data
-      if (data.tokens) {
-        localStorage.setItem('accessToken', data.tokens.access)
-        localStorage.setItem('refreshToken', data.tokens.refresh)
-      } else if (data.access && data.refresh) {
-        localStorage.setItem('accessToken', data.access)
-        localStorage.setItem('refreshToken', data.refresh)
+      if (!accessToken || !refreshToken || !userData) {
+        throw new Error('Invalid response data')
       }
 
-      // Store user data if available
-      if (data.user) {
-        localStorage.setItem('userData', JSON.stringify(data.user))
-      }
+      // Store in localStorage
+      localStorage.setItem('accessToken', accessToken)
+      localStorage.setItem('refreshToken', refreshToken)
+      localStorage.setItem('userData', JSON.stringify(userData))
 
-      // Verify token storage
-      const storedAccessToken = localStorage.getItem('accessToken')
-      console.log('Stored access token:', storedAccessToken)
+      // Update the store
+      setUser(userData)
+      setTokens(accessToken, refreshToken)
 
-      if (!storedAccessToken) {
-        throw new Error('Failed to store authentication tokens')
-      }
-
+      // Navigate to dashboard after successful signup
       router.push('/dashboard')
     } catch (err) {
       console.error('Error details:', err)
       setError(err instanceof Error ? err.message : 'Failed to create account')
-    } finally {
       setIsLoading(false)
     }
   }
