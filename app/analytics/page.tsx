@@ -1,9 +1,86 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { BarChart, LineChart, PieChart, TrendingUp, TrendingDown, Clock, Calendar, CheckCircle2 } from "lucide-react"
 
+interface DashboardData {
+  templates: any[]
+  sessions: any[]
+}
+
 export default function AnalyticsPage() {
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const accessToken = localStorage.getItem('accessToken')
+        if (!accessToken) {
+          throw new Error('No access token found')
+        }
+
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/interview/dashboard/`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch dashboard data')
+        }
+
+        const data = await response.json()
+        setDashboardData(data)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchDashboardData()
+  }, [])
+
+  // Calculate statistics from dashboard data
+  const calculateStats = () => {
+    if (!dashboardData) return {
+      totalTime: 0,
+      completedInterviews: 0,
+      averageScore: 0,
+      totalQuestions: 0
+    }
+
+    const completedSessions = dashboardData.sessions.filter(session => session.status === 'completed')
+    const totalTime = dashboardData.sessions.reduce((acc, session) => acc + (session.duration_minutes || 0), 0)
+    const totalQuestions = dashboardData.sessions.reduce((acc, session) => {
+      const questionCount = session.questions?.questions?.length || 0
+      return acc + questionCount
+    }, 0)
+
+    return {
+      totalTime,
+      completedInterviews: completedSessions.length,
+      averageScore: 78, // Placeholder since score isn't in the API response
+      totalQuestions
+    }
+  }
+
+  const stats = calculateStats()
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+  }
+
+  if (error) {
+    return <div className="flex items-center justify-center min-h-screen text-destructive">{error}</div>
+  }
+
   return (
     <div className="flex flex-col">
       <div className="flex-1 space-y-4 p-8 pt-6">
@@ -28,7 +105,7 @@ export default function AnalyticsPage() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">18.5h</div>
+              <div className="text-2xl font-bold">{stats.totalTime}m</div>
               <div className="flex items-center space-x-2">
                 <TrendingUp className="h-4 w-4 text-green-600" />
                 <p className="text-xs text-green-600">+12% from last month</p>
@@ -41,7 +118,7 @@ export default function AnalyticsPage() {
               <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">24</div>
+              <div className="text-2xl font-bold">{stats.completedInterviews}</div>
               <div className="flex items-center space-x-2">
                 <TrendingUp className="h-4 w-4 text-green-600" />
                 <p className="text-xs text-green-600">+8% from last month</p>
@@ -54,7 +131,7 @@ export default function AnalyticsPage() {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">78%</div>
+              <div className="text-2xl font-bold">{stats.averageScore}%</div>
               <div className="flex items-center space-x-2">
                 <TrendingUp className="h-4 w-4 text-green-600" />
                 <p className="text-xs text-green-600">+5% from last month</p>
@@ -67,7 +144,7 @@ export default function AnalyticsPage() {
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">342</div>
+              <div className="text-2xl font-bold">{stats.totalQuestions}</div>
               <div className="flex items-center space-x-2">
                 <TrendingUp className="h-4 w-4 text-green-600" />
                 <p className="text-xs text-green-600">+15% from last month</p>

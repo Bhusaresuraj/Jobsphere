@@ -46,13 +46,24 @@ export default function LoginPage() {
 
       if (response.ok) {
         const data = await response.json()
+        
+        // Store in localStorage
+        localStorage.setItem('accessToken', data.access)
+        localStorage.setItem('refreshToken', data.refresh)
+        localStorage.setItem('userData', JSON.stringify(data.user))
+        
+        // Update store
         setUser(data.user)
         setTokens(data.access, data.refresh)
+        
         router.push('/dashboard')
+      } else {
+        const errorData = await response.json()
+        setError(errorData.detail || 'Invalid email or password')
       }
     } catch (err) {
       console.error('Login error:', err)
-      setError('Invalid email or password')
+      setError('Failed to login. Please try again.')
     } finally {
       setIsLoading(false)
     }

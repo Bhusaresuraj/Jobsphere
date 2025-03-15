@@ -21,17 +21,47 @@ import { useUserStore } from '@/store/useUserStore'
 
 export function MainNav() {
   const router = useRouter()
-  const { user, clearUser } = useUserStore()
+  const { user, setUser, setTokens } = useUserStore()
   const pathname = usePathname()
   const [isLoggedIn, setIsLoggedIn] = React.useState(false)
   const [isMenuOpen, setIsMenuOpen] = React.useState(false)
 
-  // Check if user is on authenticated routes to determine login state
+  // Check authentication status using both store and tokens
   React.useEffect(() => {
-    const authenticatedRoutes = ["/dashboard", "/interviews", "/analytics", "/settings"]
-    const isAuthenticated = authenticatedRoutes.some((route) => pathname.startsWith(route))
-    setIsLoggedIn(isAuthenticated)
-  }, [pathname])
+    const checkAuth = () => {
+      const accessToken = localStorage.getItem('accessToken')
+      const refreshToken = localStorage.getItem('refreshToken')
+      const userData = localStorage.getItem('userData')
+      
+      if (accessToken && refreshToken && userData) {
+        try {
+          const parsedUserData = JSON.parse(userData)
+          // Update the store if it's not already set
+          if (!user) {
+            setUser(parsedUserData)
+            setTokens(accessToken, refreshToken)
+          }
+          setIsLoggedIn(true)
+        } catch (e) {
+          console.error('Failed to parse user data:', e)
+          // Clear everything if parsing fails
+          localStorage.removeItem('accessToken')
+          localStorage.removeItem('refreshToken')
+          localStorage.removeItem('userData')
+          setIsLoggedIn(false)
+        }
+      } else {
+        setIsLoggedIn(false)
+      }
+    }
+
+    // Check immediately and also whenever user state changes
+    checkAuth()
+    
+    // Add event listener for storage changes
+    window.addEventListener('storage', checkAuth)
+    return () => window.removeEventListener('storage', checkAuth)
+  }, [user, setUser, setTokens])
 
   const routes = [
     {
@@ -77,7 +107,11 @@ export function MainNav() {
   const displayedRoutes = isLoggedIn ? authenticatedRoutes : routes
 
   const handleSignOut = () => {
-    clearUser()
+    localStorage.removeItem('accessToken')
+    localStorage.removeItem('refreshToken')
+    localStorage.removeItem('userData')
+    useUserStore.setState({ user: null, accessToken: null, refreshToken: null })
+    setIsLoggedIn(false)
     router.push('/')
   }
 

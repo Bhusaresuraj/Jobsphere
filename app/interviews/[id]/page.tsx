@@ -43,6 +43,11 @@ interface Template {
   }
 }
 
+interface ParsedQuestion {
+  mainQuestion: string
+  followUpQuestion: string
+}
+
 interface InterviewData {
   questions: {
     questions: string[]
@@ -380,8 +385,7 @@ export default function InterviewPage({ params: paramsPromise }: { params: Promi
   }
 
   const questions = (isInterviewStarted && interviewData ? interviewData.questions.questions : template.questions.questions)
-    .filter((q: string) => q.startsWith('**Question:**'))
-    .map((q: string) => q.replace('**Question:**', '').trim())
+  const parsedQuestions = parseQuestions(questions)
 
   return (
     <div className="container py-8">
@@ -434,7 +438,12 @@ export default function InterviewPage({ params: paramsPromise }: { params: Promi
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-lg mb-6">{questions[currentQuestion - 1]}</div>
+                  <div className="space-y-4">
+                    <div className="text-lg">{parsedQuestions[currentQuestion - 1]?.mainQuestion}</div>
+                    <div className="text-sm text-muted-foreground">
+                      Follow-up: {parsedQuestions[currentQuestion - 1]?.followUpQuestion}
+                    </div>
+                  </div>
 
                   <div className="flex justify-center items-center h-40 bg-muted rounded-lg mb-4">
                     {audioFiles[currentQuestion] ? (
@@ -577,7 +586,7 @@ export default function InterviewPage({ params: paramsPromise }: { params: Promi
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {questions.map((question, index) => (
+                    {parsedQuestions.map((question, index) => (
                       <div key={index} className="space-y-2">
                         <div className="flex items-center justify-between">
                           <div
@@ -595,12 +604,14 @@ export default function InterviewPage({ params: paramsPromise }: { params: Promi
                               {index + 1}
                             </div>
                             <span className="text-sm truncate max-w-[200px]">
-                              {question.length > 40 ? `${question.substring(0, 40)}...` : question}
+                              {question.mainQuestion.length > 40 
+                                ? `${question.mainQuestion.substring(0, 40)}...` 
+                                : question.mainQuestion}
                             </span>
                           </div>
                           {index + 1 < currentQuestion && <CheckCircle2 className="h-4 w-4 text-primary" />}
                         </div>
-                        {index < questions.length - 1 && <div className="ml-3 border-l border-muted h-4"></div>}
+                        {index < parsedQuestions.length - 1 && <div className="ml-3 border-l border-muted h-4"></div>}
                       </div>
                     ))}
                   </div>
@@ -783,4 +794,39 @@ export default function InterviewPage({ params: paramsPromise }: { params: Promi
       )}
     </div>
   )
+}
+
+const parseQuestions = (questions: string[]): ParsedQuestion[] => {
+  const parsedQuestions: ParsedQuestion[] = []
+  
+  // Skip the first and last elements as they are intro and outro text
+  const relevantQuestions = questions.slice(1, -1)
+  
+  let currentQuestion: Partial<ParsedQuestion> = {}
+  
+  relevantQuestions.forEach(line => {
+    if (line.startsWith('### Question')) {
+      // Start of new question, save previous if exists
+      if (currentQuestion.mainQuestion) {
+        parsedQuestions.push(currentQuestion as ParsedQuestion)
+        currentQuestion = {}
+      }
+    } else if (line.startsWith('**Q:**')) {
+      currentQuestion.mainQuestion = line.replace('**Q:**', '').trim()
+    } else if (line.startsWith('**Follow-up:**')) {
+      currentQuestion.followUpQuestion = line.replace('**Follow-up:**', '').trim()
+      // Add the complete question
+      if (currentQuestion.mainQuestion) {
+        parsedQuestions.push(currentQuestion as ParsedQuestion)
+        currentQuestion = {}
+      }
+    }
+  })
+
+  // Add the last question if exists
+  if (currentQuestion.mainQuestion) {
+    parsedQuestions.push(currentQuestion as ParsedQuestion)
+  }
+
+  return parsedQuestions
 }

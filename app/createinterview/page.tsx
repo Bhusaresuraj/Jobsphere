@@ -116,7 +116,13 @@ export default function CreateInterviewPage() {
   })
 
   const handleChange = (field: keyof InterviewTemplate, value: any) => {
-    setConfig(prev => ({ ...prev, [field]: value }))
+    if (field === 'years_of_experience' || field === 'num_questions' || field === 'session_duration') {
+      // Handle empty string or invalid number input
+      const numValue = value === '' ? 0 : Number(value)
+      setConfig(prev => ({ ...prev, [field]: isNaN(numValue) ? 0 : numValue }))
+    } else {
+      setConfig(prev => ({ ...prev, [field]: value }))
+    }
   }
 
   const toggleArrayItem = (field: keyof InterviewTemplate, item: string) => {
@@ -262,8 +268,8 @@ export default function CreateInterviewPage() {
                     <Input
                       id="years_of_experience"
                       type="number"
-                      value={config.years_of_experience}
-                      onChange={(e) => handleChange('years_of_experience', parseInt(e.target.value))}
+                      value={config.years_of_experience || ''}
+                      onChange={(e) => handleChange('years_of_experience', e.target.value)}
                       min="0"
                       max="50"
                     />
@@ -353,8 +359,8 @@ export default function CreateInterviewPage() {
                     <Input
                       id="num_questions"
                       type="number"
-                      value={config.num_questions}
-                      onChange={(e) => handleChange('num_questions', parseInt(e.target.value))}
+                      value={config.num_questions || ''}
+                      onChange={(e) => handleChange('num_questions', e.target.value)}
                       min="1"
                       max="50"
                     />
@@ -365,8 +371,8 @@ export default function CreateInterviewPage() {
                     <Input
                       id="session_duration"
                       type="number"
-                      value={config.session_duration}
-                      onChange={(e) => handleChange('session_duration', parseInt(e.target.value))}
+                      value={config.session_duration || ''}
+                      onChange={(e) => handleChange('session_duration', e.target.value)}
                       min="15"
                       max="180"
                       step="15"

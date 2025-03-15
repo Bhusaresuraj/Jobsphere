@@ -81,11 +81,33 @@ export default function SignupPage() {
       const data = await response.json()
       
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to create account')
+        throw new Error(data.message || data.detail || 'Failed to create account')
       }
-      localStorage.setItem('accessToken', data.access)
-      localStorage.setItem('refreshToken', data.refresh)
-      localStorage.setItem('userData', JSON.stringify(data.user))
+
+      // Log the response data to debug
+      console.log('Signup response:', data)
+
+      // Store tokens and user data
+      if (data.tokens) {
+        localStorage.setItem('accessToken', data.tokens.access)
+        localStorage.setItem('refreshToken', data.tokens.refresh)
+      } else if (data.access && data.refresh) {
+        localStorage.setItem('accessToken', data.access)
+        localStorage.setItem('refreshToken', data.refresh)
+      }
+
+      // Store user data if available
+      if (data.user) {
+        localStorage.setItem('userData', JSON.stringify(data.user))
+      }
+
+      // Verify token storage
+      const storedAccessToken = localStorage.getItem('accessToken')
+      console.log('Stored access token:', storedAccessToken)
+
+      if (!storedAccessToken) {
+        throw new Error('Failed to store authentication tokens')
+      }
 
       router.push('/dashboard')
     } catch (err) {
