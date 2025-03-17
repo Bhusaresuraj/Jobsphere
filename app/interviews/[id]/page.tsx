@@ -803,68 +803,76 @@ const parseQuestions = (questions: string[]): ParsedQuestion[] => {
   const relevantQuestions = questions.slice(1, -1)
   
   let currentQuestion: Partial<ParsedQuestion> = {}
+  let isProcessingQuestion = false
   
   relevantQuestions.forEach(line => {
-    // Skip empty lines
-    if (!line.trim()) return
+    // Skip empty lines or separator lines
+    if (!line.trim() || line.trim() === '---' || line.trim() === '-') {
+      return
+    }
 
-    // Format 1: "### Question 1: Design Process"
-    if (line.match(/^### Question \d+: /)) {
+    // Check for section headers and skip them
+    if (line.startsWith('###') || line.match(/^(Technical|Behavioral|Situational|Problem-solving|Competency-based|Cultural Fit) Questions?:?$/i)) {
       if (currentQuestion.mainQuestion) {
+        if (!currentQuestion.followUpQuestion) {
+          currentQuestion.followUpQuestion = "No follow-up question provided."
+        }
         parsedQuestions.push(currentQuestion as ParsedQuestion)
         currentQuestion = {}
       }
+      isProcessingQuestion = false
+      return
     }
-    // Format 2: "### 1. Behavioral: "
-    else if (line.match(/^### \d+\./)) {
+
+    // Handle numbered questions with various formats
+    const numberedQuestionMatch = line.match(/^(\d+\.)?\s*\*?\*?(Q(uestion)?:|Tell me about|Describe|Explain|Imagine|Suppose|Can you|What|How)/i)
+    if (numberedQuestionMatch) {
       if (currentQuestion.mainQuestion) {
+        if (!currentQuestion.followUpQuestion) {
+          currentQuestion.followUpQuestion = "No follow-up question provided."
+        }
         parsedQuestions.push(currentQuestion as ParsedQuestion)
         currentQuestion = {}
       }
+      isProcessingQuestion = true
     }
-    // Format 3: "### Technical Questions"
-    else if (line.match(/^### [A-Za-z]+ Questions?$/)) {
-      if (currentQuestion.mainQuestion) {
-        parsedQuestions.push(currentQuestion as ParsedQuestion)
-        currentQuestion = {}
+
+    // Extract main question
+    if (isProcessingQuestion || line.includes('**Q:**') || line.includes('**Question:**') || line.match(/^\d+\.\s*\*\*.*?\*\*:/)) {
+      let questionText = line
+      
+      // Remove numbering and formatting
+      questionText = questionText.replace(/^\d+\.\s*/, '')
+      questionText = questionText.replace(/\*\*Q:\*\*\s*/, '')
+      questionText = questionText.replace(/\*\*Question:\*\*\s*/, '')
+      questionText = questionText.replace(/^[-*]\s*/, '')
+      questionText = questionText.replace(/\*\*/g, '')
+      
+      if (!currentQuestion.mainQuestion) {
+        currentQuestion.mainQuestion = questionText.trim()
       }
     }
-    // Format 4: "1. **Question**:"
-    else if (line.match(/^\d+\. \*\*Question\*\*:/)) {
-      if (currentQuestion.mainQuestion) {
-        parsedQuestions.push(currentQuestion as ParsedQuestion)
-        currentQuestion = {}
+
+    // Extract follow-up question with various formats
+    const followUpPatterns = [
+      /\*\*Follow-up:\*\*\s*(.*)/i,
+      /\*Follow-up:\*\s*(.*)/i,
+      /Follow-up:\s*(.*)/i,
+      /- \*\*Follow-up\*\*:\s*(.*)/i,
+      /\*\*Follow-up Question:\*\*\s*(.*)/i
+    ]
+
+    for (const pattern of followUpPatterns) {
+      const match = line.match(pattern)
+      if (match) {
+        currentQuestion.followUpQuestion = match[1].trim()
+        break
       }
-    }
-
-    // Handle main questions
-    if (line.includes('**Q:**')) {
-      currentQuestion.mainQuestion = line.split('**Q:**')[1].trim()
-    } else if (line.includes('**Question:**')) {
-      currentQuestion.mainQuestion = line.split('**Question:**')[1].trim()
-    } else if (line.match(/^\d+\. \*\*.*?\*\*: /)) {
-      currentQuestion.mainQuestion = line.split('**: ')[1].trim()
-    }
-
-    // Handle follow-up questions
-    if (line.includes('**Follow-up:**')) {
-      currentQuestion.followUpQuestion = line.split('**Follow-up:**')[1].trim()
-    } else if (line.includes('*Follow-up:*')) {
-      currentQuestion.followUpQuestion = line.split('*Follow-up:*')[1].trim()
-    } else if (line.includes('- **Follow-up**:')) {
-      currentQuestion.followUpQuestion = line.split('- **Follow-up**:')[1].trim()
-    }
-
-    // If we have both main and follow-up questions, add to parsed questions
-    if (currentQuestion.mainQuestion && currentQuestion.followUpQuestion) {
-      parsedQuestions.push(currentQuestion as ParsedQuestion)
-      currentQuestion = {}
     }
   })
 
-  // Add the last question if it exists and has at least a main question
+  // Add the last question if it exists
   if (currentQuestion.mainQuestion) {
-    // If no follow-up question, set a default
     if (!currentQuestion.followUpQuestion) {
       currentQuestion.followUpQuestion = "No follow-up question provided."
     }
